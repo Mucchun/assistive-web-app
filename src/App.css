@@ -1,0 +1,111 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #111827;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+.app {
+  min-height: 100vh;
+  padding: 24px;
+  text-align: center;
+}
+
+h1 {
+  font-size: 30px;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  color: #d1d5db;
+  margin-bottom: 20px;
+}
+
+.object-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+button {
+  border: none;
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 16px;
+  font-weight: bold;
+  color: white;
+  background: #374151;
+  cursor: pointer;
+}
+
+button.selected {
+  background: #2563eb;
+}
+
+button:disabled {
+  background: #6b7280;
+  cursor: not-allowed;
+}
+
+.camera-section {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.video {
+  width: 100%;
+  max-width: 420px;
+  min-height: 260px;
+  border-radius: 16px;
+  background: black;
+}
+
+.hidden-canvas {
+  display: none;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 320px;
+  margin: 0 auto 20px auto;
+}
+
+.controls button:nth-child(1) {
+  background: #16a34a;
+}
+
+.controls button:nth-child(2) {
+  background: #2563eb;
+}
+
+.controls button:nth-child(3) {
+  background: #7c3aed;
+}
+
+.status {
+  background: rgba(0, 0, 0, 0.35);
+  padding: 16px;
+  border-radius: 12px;
+  color: #f9fafb;
+  line-height: 1.5;
+}
+
+.detections {
+  margin-top: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 16px;
+  border-radius: 12px;
+}
+
+.detections h2 {
+  margin-top: 0;
+}
