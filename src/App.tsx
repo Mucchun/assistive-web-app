@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
 import * as tf from "@tensorflow/tfjs";
-import Anthropic from "@anthropic-ai/sdk";
 import "./App.css";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -148,7 +147,6 @@ export default function App() {
   const [history,    setHistory]    = useState<ScanEntry[]>(() => loadHistory());
 
   // Settings
-  const [apiKey,      setApiKey]     = useState(() => localStorage.getItem("ai-key") ?? "");
   const [threshold,   setThreshold]  = useState(() => parseFloat(localStorage.getItem("thresh") ?? "0.5"));
   const [speechRate,  setSpeechRate] = useState(() => parseFloat(localStorage.getItem("rate") ?? "1.0"));
   const [textSize,    setTextSize]   = useState<TextSize>(() => (localStorage.getItem("tsize") as TextSize) ?? "normal");
@@ -167,7 +165,6 @@ export default function App() {
   }, [lang]);
 
   // Persist settings
-  useEffect(() => { localStorage.setItem("ai-key",  apiKey); },      [apiKey]);
   useEffect(() => { localStorage.setItem("thresh",  String(threshold)); }, [threshold]);
   useEffect(() => { localStorage.setItem("tsize",   textSize); },     [textSize]);
   useEffect(() => { localStorage.setItem("hc",      String(highContrast)); }, [highContrast]);
@@ -185,7 +182,7 @@ export default function App() {
 
   // PWA service worker
   useEffect(() => {
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register(import.meta.env.BASE_URL + "sw.js").catch(() => {});
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
   }, []);
 
   // Cleanup
@@ -225,21 +222,17 @@ export default function App() {
   async function callClaude(prompt: string): Promise<string> {
     const img = captureFrame();
     if (!img) throw new Error("No frame");
-    const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
-    const res = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 300,
-      messages: [{ role: "user", content: [
-        { type: "image", source: { type: "base64", media_type: "image/jpeg", data: img } },
-        { type: "text", text: prompt },
-      ]}],
+    const res = await fetch("/api/claude", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, imageBase64: img }),
     });
-    const b = res.content.find(x => x.type === "text");
-    return b && b.type === "text" ? b.text : "";
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    const data = await res.json() as { text: string };
+    return data.text;
   }
 
   async function withClaude(prompt: string, loadingMsg: string) {
-    if (!apiKey) { speak("Enter your Anthropic API key in settings."); return; }
     if (aiLoading) return;
     setAiLoading(true);
     setStatus(loadingMsg);
@@ -539,10 +532,10 @@ export default function App() {
                 </button>
 
                 <div className="btn-row">
-                  <button className="btn btn-purple" onClick={describeScene} disabled={aiLoading || !apiKey}>
+                  <button className="btn btn-purple" onClick={describeScene} disabled={aiLoading}>
                     {aiLoading ? "…" : "Describe"}
                   </button>
-                  <button className="btn btn-orange" onClick={readText} disabled={aiLoading || !apiKey}>
+                  <button className="btn btn-orange" onClick={readText} disabled={aiLoading}>
                     {aiLoading ? "…" : "Read Text"}
                   </button>
                   <button className={`btn ${voiceOn ? "btn-red" : "btn-teal"}`} onClick={voiceOn ? stopVoice : startVoice}>
@@ -565,29 +558,23 @@ export default function App() {
                   </button>
                 </div>
 
-                {apiKey && (
-                  <div className="input-row">
-                    <input
-                      type="text"
-                      className="row-input"
-                      placeholder="Ask about the scene…"
-                      value={aiQ}
-                      onChange={e => setAiQ(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter") { askQuestion(aiQ); setAiQ(""); } }}
-                      aria-label="Ask Claude"
-                    />
-                    <button className="btn btn-indigo" onClick={() => { askQuestion(aiQ); setAiQ(""); }} disabled={aiLoading || !aiQ.trim()}>
-                      Ask
-                    </button>
-                  </div>
-                )}
+                <div className="input-row">
+                  <input
+                    type="text"
+                    className="row-input"
+                    placeholder="Ask about the scene…"
+                    value={aiQ}
+                    onChange={e => setAiQ(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") { askQuestion(aiQ); setAiQ(""); } }}
+                    aria-label="Ask Claude"
+                  />
+                  <button className="btn btn-indigo" onClick={() => { askQuestion(aiQ); setAiQ(""); }} disabled={aiLoading || !aiQ.trim()}>
+                    Ask
+                  </button>
+                </div>
               </>
             )}
           </section>
-
-          {!apiKey && camOn && (
-            <p className="api-hint">Add an API key in ⚙ Settings to enable AI features.</p>
-          )}
 
           {preds.length > 0 && (
             <section className="detections">
@@ -696,16 +683,6 @@ export default function App() {
       {activeTab === "settings" && (
         <>
           <h1>Settings</h1>
-
-          <section className="settings-section">
-            <h2>AI (Claude)</h2>
-            <div className="setting-row">
-              <label htmlFor="apikey">Anthropic API Key</label>
-              <input id="apikey" type="password" className="api-input"
-                value={apiKey} onChange={e => setApiKey(e.target.value)}
-                placeholder="sk-ant-…" autoComplete="off" />
-            </div>
-          </section>
 
           <section className="settings-section">
             <h2>Detection</h2>
