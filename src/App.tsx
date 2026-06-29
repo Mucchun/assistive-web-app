@@ -242,15 +242,15 @@ export default function App() {
   // ── Claude ───────────────────────────────────────────────────────────────────
   async function callClaude(prompt: string): Promise<string> {
     const img = captureFrame();
-    if (!img) throw new Error("No frame");
+    if (!img) throw new Error("Camera not ready.");
     const res = await fetch("/api/claude", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt, imageBase64: img }),
     });
-    if (!res.ok) throw new Error(`API error ${res.status}`);
-    const data = await res.json() as { text: string };
-    return data.text;
+    const data = await res.json() as { text?: string; error?: string };
+    if (!res.ok || data.error) throw new Error(data.error ?? `Server error ${res.status}`);
+    return data.text ?? "";
   }
 
   async function withClaude(prompt: string, loadingMsg: string) {
@@ -260,9 +260,11 @@ export default function App() {
     speak(loadingMsg);
     try {
       const r = await callClaude(prompt);
-      setStatus(r); speak(r);
-    } catch {
-      speak("Could not connect. Check your API key.");
+      if (r) { setStatus(r); speak(r); } else { setStatus("No response."); speak("No response."); }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Request failed.";
+      setStatus(msg);
+      speak(msg);
     } finally {
       setAiLoading(false);
     }

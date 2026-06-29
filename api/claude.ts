@@ -1,23 +1,19 @@
-// Vercel Edge Function — keeps the Anthropic API key server-side
-export const config = { runtime: "edge" };
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: "API key not configured on server." }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return res.status(500).json({ error: "API key not configured on server." });
   }
 
-  const { prompt, imageBase64 } = await req.json() as {
-    prompt: string;
-    imageBase64: string;
-  };
+  const { prompt, imageBase64 } = req.body as { prompt: string; imageBase64: string };
+  if (!prompt || !imageBase64) {
+    return res.status(400).json({ error: "Missing prompt or image." });
+  }
 
   const upstream = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -39,10 +35,16 @@ export default async function handler(req: Request): Promise<Response> {
     }),
   });
 
-  const data = await upstream.json() as { content?: Array<{ type: string; text?: string }> };
-  const text = data.content?.find(b => b.type === "text")?.text ?? "";
+  const data = await upstream.json() as {
+    content?: Array<{ type: string; text?: string }>;
+    error?: { type: string; message: string };
+  };
 
-  return new Response(JSON.stringify({ text }), {
-    headers: { "Content-Type": "application/json" },
-  });
+  if (!upstream.ok || data.error) {
+    const msg = data.error?.message ?? `Upstream error ${upstream.status}`;
+    return res.status(upstream.ok ? 500 : upstream.status).json({ error: msg });
+  }
+
+  const text = data.content?.find(b => b.type === "text")?.text ?? "";
+  return res.status(200).json({ text });
 }
