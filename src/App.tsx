@@ -191,6 +191,27 @@ export default function App() {
     recRef.current?.stop();
   }, []);
 
+  // Save history snapshot when leaving the scan tab
+  useEffect(() => {
+    if (activeTab !== "scan") recordSession(searchRef.current ?? undefined);
+  // recordSession uses only refs + setHistory (both stable) — no dep needed
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  // Haptic + audible feedback on every button press
+  useEffect(() => {
+    function onPress(e: PointerEvent) {
+      const btn = (e.target as HTMLElement).closest("button");
+      if (!btn || btn.disabled) return;
+      if ("vibrate" in navigator) navigator.vibrate(30);
+      const label = btn.getAttribute("aria-label") ??
+        btn.textContent?.replace(/[^\w\s]/g, "").trim() ?? "";
+      if (label.replace(/\s/g, "").length >= 2) speak(label);
+    }
+    document.addEventListener("pointerdown", onPress);
+    return () => document.removeEventListener("pointerdown", onPress);
+  }, []);
+
   // ── Camera ───────────────────────────────────────────────────────────────────
   async function startCam() {
     try {
@@ -497,48 +518,58 @@ export default function App() {
   return (
     <main className={["app", textSize !== "normal" ? `text-${textSize}` : "", highContrast ? "high-contrast" : ""].filter(Boolean).join(" ")}>
 
-      {/* ── Scan Tab ─────────────────────────────────────────── */}
+      {/* ── Scan Tab: title + search banner ──────────────────── */}
       {activeTab === "scan" && (
         <>
           <h1 className="app-title">Assistive Vision</h1>
-
           {searchTarget && (
             <div className="search-banner">
               <span>🔍 Searching: <strong>{searchTarget}</strong></span>
-              <button className="btn-xs btn-red" onClick={stopSearch}>Stop</button>
+              <button className="btn-xs btn-red" aria-label="Stop search" onClick={stopSearch}>Stop</button>
             </div>
           )}
+        </>
+      )}
 
-          <div className="cam-wrap">
-            <video ref={videoRef} className="video" playsInline muted autoPlay />
-            <canvas ref={canvasRef} className="hidden-canvas" />
-            {detecting && <span className="live-badge">● LIVE</span>}
-          </div>
+      {/* Camera — always mounted so stream survives tab switches */}
+      <div className={`cam-wrap${activeTab !== "scan" ? " cam-offscreen" : ""}`}>
+        <video ref={videoRef} className="video" playsInline muted autoPlay />
+        <canvas ref={canvasRef} className="hidden-canvas" />
+        {detecting && activeTab === "scan" && <span className="live-badge">● LIVE</span>}
+      </div>
 
+      {/* ── Scan Tab: controls + detections ──────────────────── */}
+      {activeTab === "scan" && (
+        <>
           <p className="status" role="status" aria-live="polite">{status}</p>
 
           <section className="controls">
             {!camOn ? (
-              <button className="btn btn-green" onClick={startCam} disabled={!model}>
+              <button className="btn btn-green" aria-label="Start Camera" onClick={startCam} disabled={!model}>
                 {model ? "Start Camera" : "Loading Model…"}
               </button>
             ) : (
               <>
                 <button
                   className={`btn ${detecting ? "btn-red" : "btn-blue"}`}
+                  aria-label={detecting ? "Stop Detection" : "Start Detection"}
                   onClick={detecting ? stopDetect : startDetect}
                 >
                   {detecting ? "Stop Detection" : "Start Detection"}
                 </button>
 
                 <div className="btn-row">
-                  <button className="btn btn-purple" onClick={describeScene} disabled={aiLoading}>
+                  <button className="btn btn-purple" aria-label="Describe scene" onClick={describeScene} disabled={aiLoading}>
                     {aiLoading ? "…" : "Describe"}
                   </button>
-                  <button className="btn btn-orange" onClick={readText} disabled={aiLoading}>
+                  <button className="btn btn-orange" aria-label="Read text" onClick={readText} disabled={aiLoading}>
                     {aiLoading ? "…" : "Read Text"}
                   </button>
-                  <button className={`btn ${voiceOn ? "btn-red" : "btn-teal"}`} onClick={voiceOn ? stopVoice : startVoice}>
+                  <button
+                    className={`btn ${voiceOn ? "btn-red" : "btn-teal"}`}
+                    aria-label={voiceOn ? "Voice off" : "Voice on"}
+                    onClick={voiceOn ? stopVoice : startVoice}
+                  >
                     {voiceOn ? "🎙 Off" : "🎙 Voice"}
                   </button>
                 </div>
@@ -553,7 +584,7 @@ export default function App() {
                     onKeyDown={e => { if (e.key === "Enter") { startSearch(searchIn); setSearchIn(""); } }}
                     aria-label="Object to find"
                   />
-                  <button className="btn btn-yellow" onClick={() => { startSearch(searchIn); setSearchIn(""); }}>
+                  <button className="btn btn-yellow" aria-label="Find object" onClick={() => { startSearch(searchIn); setSearchIn(""); }}>
                     Find
                   </button>
                 </div>
@@ -568,7 +599,7 @@ export default function App() {
                     onKeyDown={e => { if (e.key === "Enter") { askQuestion(aiQ); setAiQ(""); } }}
                     aria-label="Ask Claude"
                   />
-                  <button className="btn btn-indigo" onClick={() => { askQuestion(aiQ); setAiQ(""); }} disabled={aiLoading || !aiQ.trim()}>
+                  <button className="btn btn-indigo" aria-label="Ask Claude" onClick={() => { askQuestion(aiQ); setAiQ(""); }} disabled={aiLoading || !aiQ.trim()}>
                     Ask
                   </button>
                 </div>
@@ -606,7 +637,7 @@ export default function App() {
             )}
           </div>
           {history.length === 0 ? (
-            <p className="empty-msg">No scans yet. History saves when you stop detection.</p>
+            <p className="empty-msg">No scans yet. History saves automatically as you scan.</p>
           ) : (
             <ul className="hist-list">
               {history.map(entry => (

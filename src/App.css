@@ -46,6 +46,8 @@ h2 { font-size: 16px; font-weight: 700; color: #94a3b8; text-transform: uppercas
 
 /* ── Camera ──────────────────────────────────────────────────────────────── */
 .cam-wrap { position: relative; display: flex; justify-content: center; margin-bottom: 14px; }
+/* Keeps video stream alive while hidden on other tabs */
+.cam-offscreen { position: fixed; top: -200px; left: -200px; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
 .video { width: 100%; max-width: 480px; min-height: 220px; border-radius: 16px; background: #1e293b; display: block; }
 .hidden-canvas { display: none; }
 .live-badge {
